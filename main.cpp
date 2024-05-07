@@ -1,14 +1,18 @@
 #include <GL/glew.h>
 #include <GL/gl.h>
+#include <GL/glext.h>
 #include <GLFW/glfw3.h>
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/ext/vector_float3.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <vector>
 
 #include "LoadShaders.h"
+#include "PlotVertices.h"
 
 
 static constexpr int g_screenWidth = 600;
 static constexpr int g_screenHeight = 400;
-
 
 int main(int, char**){
     // GLFW
@@ -21,29 +25,64 @@ int main(int, char**){
 
     // GLEW
     glewInit();
-    glClearColor(0.25f,0.2f,0.2f,0.0f);
+    glClearColor(0.2f,0.2f,0.22f,0.0f);
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
+    glEnable(GL_CULL_FACE);
 
     // Shaders
     GLuint programID = LoadShaders("shaders/vertex.glsl", "shaders/fragment.glsl");
+    glUseProgram(programID);
+    
+    // Shader uniforms
     GLuint matrixID = glGetUniformLocation(programID, "mvp");
+    GLuint modelMatrixID = glGetUniformLocation(programID, "m");
+    GLuint viewMatrixID = glGetUniformLocation(programID, "v");
+    GLuint lightID = glGetUniformLocation(programID, "lightPos_worldspace");
 
     // Vertices
     GLuint vertexArrayID;
     glGenVertexArrays(1, &vertexArrayID);
     glBindVertexArray(vertexArrayID);
 
-    GLfloat vertBufferData[] = {
-        0,0,0,
-        1,1,0,
-        0,1,0
-    };
+    // Data
+    std::vector<glm::vec3> vVertexBufferData;
+    std::vector<glm::vec3> vNormalsBufferData;
+    CreateBox(vVertexBufferData, vNormalsBufferData, glm::vec3(1,1,1));
 
+    // Buffers
     GLuint vertexBuffer;
     glGenBuffers(1, &vertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertBufferData), vertBufferData, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vVertexBufferData.size() * sizeof(glm::vec3), &vVertexBufferData[0], GL_STATIC_DRAW);
+
+    GLuint normalBuffer;
+    glGenBuffers(1, &normalBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, normalBuffer);
+    glBufferData(GL_ARRAY_BUFFER, vNormalsBufferData.size() * sizeof(glm::vec3), &vNormalsBufferData[0], GL_STATIC_DRAW);
+
+    // Attribute arrays
+    glEnableVertexAttribArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    glVertexAttribPointer(
+        0,
+        3,
+        GL_FLOAT,
+        GL_FALSE,
+        0,
+        (void*)0
+    );
+
+    glEnableVertexAttribArray(1);
+    glBindBuffer(GL_ARRAY_BUFFER, normalBuffer);
+    glVertexAttribPointer(
+        1,
+        3,
+        GL_FLOAT,
+        GL_FALSE,
+        0,
+        (void*)0
+    );
 
     // View Settings
     glm::vec3 position = glm::vec3(0,0,5);
@@ -53,20 +92,24 @@ int main(int, char**){
     float moveSpeed = 10.0f;
     float lookSpeed = 0.1f;
 
+    // Camera
+    glm::mat4 projection = glm::perspective(glm::radians(45.0f), float(g_screenWidth) / float(g_screenHeight), 0.1f, 100.0f);
+    double mouseX, mouseY;
+
+    // Objects
+    glm::vec3 light = glm::vec3(2,5,4);
+    glm::mat4 model = glm::mat4(1.0);
+
     // Timer Start
     glfwSetTime(0);
     double deltaTime = 0;
 
-    while(!glfwWindowShouldClose(w) && glfwGetKey(w, GLFW_KEY_ESCAPE) != GLFW_PRESS)
-    {
-        // Mouse Look
-        double mouseX, mouseY;
+    while(!glfwWindowShouldClose(w) && glfwGetKey(w, GLFW_KEY_ESCAPE) != GLFW_PRESS) {
+        // Update Mouse Look
         glfwGetCursorPos(w, &mouseX, &mouseY);
         glfwSetCursorPos(w, g_screenWidth / 2.0, g_screenHeight / 2.0);
-        
         yaw += lookSpeed * deltaTime * float(g_screenWidth / 2.0 - mouseX);
         pitch += lookSpeed * deltaTime * float(g_screenHeight / 2.0 - mouseY);
-
         glm::vec3 direction(
             cos(pitch) * sin(yaw),
             sin(pitch),
@@ -79,7 +122,7 @@ int main(int, char**){
         );
         glm::vec3 up = glm::cross(right,direction);
 
-        // Movement
+        // Update Movement
         if(glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS){
             position += direction * moveSpeed * (float)deltaTime;
         }
@@ -94,32 +137,18 @@ int main(int, char**){
         }
 
         // Model View Projection
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f), float(g_screenWidth) / float(g_screenHeight), 0.1f, 100.0f);
         glm::mat4 view = glm::lookAt(position ,position + direction, up);
-        glm::mat4 model = glm::mat4(1.0);
         glm::mat4 mvp = projection * view * model;
 
-        // Shaders
+        // Shader uniforms
         glUniformMatrix4fv(matrixID, 1, GL_FALSE, &mvp[0][0]);
-        glUseProgram(programID);
+        glUniformMatrix4fv(modelMatrixID, 1, GL_FALSE, &model[0][0]);
+        glUniformMatrix4fv(viewMatrixID, 1, GL_FALSE, &view[0][0]);
+        glUniform3f(lightID, light.x, light.y, light.z);
 
         // Draw
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        glEnableVertexAttribArray(0);
-        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-        glVertexAttribPointer(
-            0,
-            3,
-            GL_FLOAT,
-            GL_FALSE,
-            0,
-            (void*)0
-        );
-
-        glDrawArrays(GL_TRIANGLES, 0, 1 * 3);
-        glDisableVertexAttribArray(0);
-
+        glDrawArrays(GL_TRIANGLES, 0, vVertexBufferData.size() * 3);
         glfwSwapBuffers(w);
         glfwPollEvents();
 
@@ -129,7 +158,10 @@ int main(int, char**){
     }    
 
     // Clean up
+    glDisableVertexAttribArray(0);
+    glDisableVertexAttribArray(1);
     glDeleteBuffers(1, &vertexBuffer);
+    glDeleteBuffers(1, &normalBuffer);
     glDeleteProgram(programID);
     glDeleteVertexArrays(1, &vertexArrayID);
 
