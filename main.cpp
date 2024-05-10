@@ -1,18 +1,16 @@
 #include <GL/glew.h>
 #include <GL/gl.h>
-#include <GL/glext.h>
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
 #include <glm/ext/matrix_transform.hpp>
-#include <glm/ext/vector_float3.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <vector>
+#include <glm/ext/matrix_clip_space.hpp>
 
 #include "LoadShaders.h"
 #include "PlotVertices.h"
 
 
-static constexpr int g_screenWidth = 600;
-static constexpr int g_screenHeight = 400;
+static constexpr int g_screenWidth = 1400;
+static constexpr int g_screenHeight = 800;
 
 int main(int, char**){
     // GLFW
@@ -36,9 +34,9 @@ int main(int, char**){
     
     // Shader uniforms
     GLuint matrixID = glGetUniformLocation(programID, "mvp");
-    GLuint modelMatrixID = glGetUniformLocation(programID, "m");
-    GLuint viewMatrixID = glGetUniformLocation(programID, "v");
-    GLuint lightID = glGetUniformLocation(programID, "lightPos_worldspace");
+    GLuint modelTransformID = glGetUniformLocation(programID, "modelTransform_wspace");
+    GLuint lightPositionID = glGetUniformLocation(programID, "lightPosition_wspace");
+    GLuint cameraTransformID = glGetUniformLocation(programID, "cameraTransform_wspace");
 
     // Vertices
     GLuint vertexArrayID;
@@ -48,7 +46,8 @@ int main(int, char**){
     // Data
     std::vector<glm::vec3> vVertexBufferData;
     std::vector<glm::vec3> vNormalsBufferData;
-    CreateBox(vVertexBufferData, vNormalsBufferData, glm::vec3(1,1,1));
+    //CreateBox(vVertexBufferData, vNormalsBufferData, glm::vec3(1,1,1), false);
+    CreateCylinder(vVertexBufferData, vNormalsBufferData, 0.5f, 1.0f, 32);
 
     // Buffers
     GLuint vertexBuffer;
@@ -97,7 +96,7 @@ int main(int, char**){
     double mouseX, mouseY;
 
     // Objects
-    glm::vec3 light = glm::vec3(2,5,4);
+    glm::vec3 light = glm::vec3(10,5,4);
     glm::mat4 model = glm::mat4(1.0);
 
     // Timer Start
@@ -142,9 +141,9 @@ int main(int, char**){
 
         // Shader uniforms
         glUniformMatrix4fv(matrixID, 1, GL_FALSE, &mvp[0][0]);
-        glUniformMatrix4fv(modelMatrixID, 1, GL_FALSE, &model[0][0]);
-        glUniformMatrix4fv(viewMatrixID, 1, GL_FALSE, &view[0][0]);
-        glUniform3f(lightID, light.x, light.y, light.z);
+        glUniformMatrix4fv(modelTransformID, 1, GL_FALSE, &model[0][0]);
+        glUniform3f(lightPositionID, light.x, light.y, light.z);
+        glUniformMatrix4fv(cameraTransformID, 1, GL_FALSE, &view[0][0]);
 
         // Draw
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
