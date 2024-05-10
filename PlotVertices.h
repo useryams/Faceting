@@ -8,6 +8,6 @@ void CreateBox(std::vector<glm::vec3> &vVertexBuffer, std::vector<glm::vec3> &vN
 
 void CreatePyramid(std::vector<glm::vec3> &vVertexBuffer, std::vector<glm::vec3> &vNormalsBuffer, glm::vec3 size = {1, 1, 1});
 
-void CreateCylinder(std::vector<glm::vec3> &vVertexBuffer, std::vector<glm::vec3> &vNormalsBuffer, float r = 0.5f, float h = 1.0f, int sides = 16);
+void CreateCylinder(std::vector<glm::vec3> &vVertexBuffer, std::vector<glm::vec3> &vNormalsBuffer, float r = 0.5f, float h = 1.0f, int sides = 16, bool smooth = false);
 
-void CreateSphere(std::vector<glm::vec3> &vVertexBuffer, std::vector<glm::vec3> &vNormalsBuffer, float r);
+void CreateSphere(std::vector<glm::vec3> &vVertexBuffer, std::vector<glm::vec3> &vNormalsBuffer, float r, bool smooth = false);

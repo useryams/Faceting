@@ -1,14 +1,16 @@
 #include "PlotVertices.h"
 
 #include <cmath>
+#include <cstddef>
+#include <glm/ext/vector_float3.hpp>
 #include <glm/glm.hpp>
 #include <vector>
 #include <array>
 
-
 struct Vertex {
     glm::vec3 vec;
     glm::vec3 normal;
+    Vertex(glm::vec3 vec = {0,0,0}, glm::vec3 normal = {0,0,0}) : vec(vec), normal(normal) {};
 };
 
 struct Tri {
@@ -35,6 +37,7 @@ void AddQuad(std::vector<Tri>& vTris, std::vector<Vertex> &vPoints, size_t a, si
     AddTri(vTris, vPoints, b, c, d);
 }
 
+
 void DetermineVertNormals(std::vector<Vertex>& vPoints, std::vector<Tri>& vTris) {
     for (Vertex& vert : vPoints) {
         glm::vec3 normalSum(0,0,0);
@@ -46,6 +49,28 @@ void DetermineVertNormals(std::vector<Vertex>& vPoints, std::vector<Tri>& vTris)
             }
         }
         vert.normal = glm::normalize(normalSum);
+    }
+}
+
+void FillBuffers(std::vector<Tri>& vTris, std::vector<glm::vec3> &vVertexBuffer, std::vector<glm::vec3> &vNormalsBuffer, bool smooth) {
+    vVertexBuffer.reserve(vTris.size() * 3); // n triangles with 3 vertices each
+    vNormalsBuffer.reserve(vTris.size() * 3); // n triangles with 3 vertices each
+
+    for (Tri tri : vTris) {
+        vVertexBuffer.push_back(tri.vertices.at(0)->vec);
+        vVertexBuffer.push_back(tri.vertices.at(1)->vec); 
+        vVertexBuffer.push_back(tri.vertices.at(2)->vec);
+
+        if (smooth) {
+            vNormalsBuffer.push_back(tri.vertices.at(0)->normal);
+            vNormalsBuffer.push_back(tri.vertices.at(1)->normal);
+            vNormalsBuffer.push_back(tri.vertices.at(2)->normal);
+        }
+        else {
+            vNormalsBuffer.push_back(tri.normal);
+            vNormalsBuffer.push_back(tri.normal);
+            vNormalsBuffer.push_back(tri.normal);
+        }
     }
 }
 
@@ -77,80 +102,64 @@ void CreateBox(std::vector<glm::vec3> &vVertexBuffer, std::vector<glm::vec3> &vN
     if (smooth) DetermineVertNormals(points, tris);
 
     // Fill buffers
-    vVertexBuffer.reserve(tris.size() * 3); // n triangles with 3 vertices each
-    vNormalsBuffer.reserve(tris.size() * 3); // n triangles with 3 vertices each
-    for (Tri tri : tris) {
-        vVertexBuffer.push_back(tri.vertices.at(0)->vec);
-        vVertexBuffer.push_back(tri.vertices.at(1)->vec); 
-        vVertexBuffer.push_back(tri.vertices.at(2)->vec);
-
-        if (smooth) {
-            vNormalsBuffer.push_back(tri.vertices.at(0)->normal);
-            vNormalsBuffer.push_back(tri.vertices.at(1)->normal);
-            vNormalsBuffer.push_back(tri.vertices.at(2)->normal);
-        }
-        else {
-            vNormalsBuffer.push_back(tri.normal);
-            vNormalsBuffer.push_back(tri.normal);
-            vNormalsBuffer.push_back(tri.normal);
-        }
-    }
+    FillBuffers(tris, vVertexBuffer, vNormalsBuffer, smooth);
 }
 
-// void CreatePyramid(std::vector<glm::vec3> &vVertexBuffer, std::vector<glm::vec3> &vNormalsBuffer, glm::vec3 size) {
-//     // Generate Points.
-//     std::vector<glm::vec3> points;
-//     points.resize(8);
-//     points.at(0) = glm::vec3(0,0,0) * size - size / 2.0f;
-//     points.at(1) = glm::vec3(1,0,0) * size - size / 2.0f;
-//     points.at(2) = glm::vec3(0,0,1) * size - size / 2.0f;
-//     points.at(3) = glm::vec3(1,0,1) * size - size / 2.0f;
-//     points.at(4) = glm::vec3(0.5,1,0.5) * size - size / 2.0f;
+void CreateCylinder(std::vector<glm::vec3> &vVertexBuffer, std::vector<glm::vec3> &vNormalsBuffer, float r, float h, int sides, bool smooth) {
+    // Generate Points.
+    std::vector<Vertex> points;
+    points.reserve(sides * 2 + 2);
 
-//     // Plot Vertices.
-//     vVertexBuffer.reserve(6 * 3);
-//     AddQuad(vVertexBuffer, points, 0, 1, 2, 3);
-//     AddTri(vVertexBuffer, points, 4, 0, 2);
-//     AddTri(vVertexBuffer, points, 4, 3, 1);
-//     AddTri(vVertexBuffer, points, 4, 1, 0);
-//     AddTri(vVertexBuffer, points, 4, 2, 3);
-// }
+    float increment = glm::radians(360.0f / sides);
+    glm::vec3 halfHeight = glm::vec3(0,h / 2.0f,0);
 
-// void CreateCylinder(std::vector<glm::vec3> &vVertexBuffer, std::vector<glm::vec3> &vNormalsBuffer, float r, float h, int sides) {
-//     // Generate Points.
-//     float increment = glm::radians(360.0f / sides);
+    // sides
+    for (size_t i = 0; i < sides; ++i) {
+        float angle = increment * i;
+        glm::vec3 v;
+        v.x = r * sinf(angle);
+        v.z = r * cosf(angle);
+
+        points.push_back(v + halfHeight); // top vertex
+        points.push_back(v - halfHeight); // bottom vertex
+    }
+    // Top and bottom center
+    points.push_back(halfHeight);
+    points.push_back(-halfHeight);
+
+    // Used next
+    size_t lastTop = points.size() - 4;
+    size_t lastBottom = points.size() - 3;
+    size_t topCenter = points.size() - 2;
+    size_t bottomCenter = points.size() - 1;
+
+    // no vertices are drawn if i remove these?
+    size_t a = 0;
+    size_t b = 0;
+
+    // Plot Vertices.
+    std::vector<Tri> tris;
+    tris.reserve(sides * 4); // n sides * 1 side quad + 1 top tri + 1 bottom tri.
+
+    // Connects last and first sides.
+    AddQuad(tris, points, lastTop, lastBottom, 1, 0); // side
+    AddTri(tris, points, topCenter,    lastTop,   0); // top
+    AddTri(tris, points, bottomCenter, 1, lastBottom); // bottom
+
+    // The rest of the sides.
+    for (size_t i = 0; i < sides - 1; ++i) {
+        size_t index = i * 2;
+        AddQuad(tris, points, index, index+1, index+3, index+2); // side
+        AddTri(tris, points, topCenter,    index,   index+2); // top
+        AddTri(tris, points, bottomCenter, index+3, index+1); // bottom
+    }
+
+    DetermineVertNormals(points, tris);
+
+    // Fill Buffers
+    FillBuffers(tris, vVertexBuffer, vNormalsBuffer, smooth);
+}
+
+void CreateSphere(std::vector<glm::vec3> &vVertexBuffer, std::vector<glm::vec3> &vNormalsBuffer, float r, bool smooth) {
     
-//     std::vector<glm::vec3> points;
-//     points.reserve(sides * 2);
-
-//     for (size_t i = 0; i < sides; ++i) {
-//         float angle = increment * i;
-
-//         glm::vec3 point = {0,0,0};
-//         point.x = r * sinf(angle);
-//         point.z = r * cosf(angle);
-
-//         points.push_back(point + glm::vec3(0,h / 2.0f,0));
-//         points.push_back(point + glm::vec3(0, -h / 2.0f,0));
-//     }
-//     points.push_back(glm::vec3(0,h/2.0f,0)); // Top center
-//     points.push_back(glm::vec3(0,-h/2.0f,0)); // Bottom center
-
-    
-//     // Plot Vertices.
-//     vVertexBuffer.reserve(sides * 2 * 6); // n sides * top and bottom * 6 points.
-
-//     AddQuad(vVertexBuffer, points, points.size() - 4, points.size() - 3, 0, 1);
-//     AddTri(vVertexBuffer, points, points.size()-2, points.size() - 4, 0);
-//     AddTri(vVertexBuffer, points, points.size()-1, 3, points.size() - 3);
-    
-//     for (size_t i = 0; i < sides * 2 - 2; i += 2) {
-//         AddQuad(vVertexBuffer, points, i, i+1, i+2, i+3);
-//         AddTri(vVertexBuffer, points, points.size()-2, i, i+2);
-//         AddTri(vVertexBuffer, points, points.size()-1, i+3, i+1);
-//     }
-// }
-
-// void CreateSphere(std::vector<glm::vec3> &vVertexBuffer, std::vector<glm::vec3> &vNormalsBuffer, float r) {
-    
-// }
+}
