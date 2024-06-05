@@ -8,7 +8,7 @@ find_package(glfw3 REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(glm)
 
-add_executable(Faceting main.cpp LoadShaders.cpp PlotVertices.cpp)
+add_executable(Faceting main.cpp LoadShaders.cpp PlotVertices.cpp BasicShapes.cpp Gemstone.cpp)
 
 set_property(TARGET Faceting PROPERTY CXX_STANDARD 20)
 

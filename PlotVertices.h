@@ -1,13 +1,24 @@
 #pragma once
 
+#include <array>
 #include <vector>
 #include <glm/glm.hpp>
 
+struct Vertex {
+    glm::vec3 vec;
+    glm::vec3 normal;
+    Vertex(glm::vec3 vec = {0,0,0}, glm::vec3 normal = {0,0,0});
+};
 
-void CreateBox(std::vector<glm::vec3> &vVertexBuffer, std::vector<glm::vec3> &vNormalsBuffer, glm::vec3 size = {1,1,1}, bool smooth = false);
+struct Tri {
+    std::array<Vertex*, 3> vertices;
+    glm::vec3 normal;
+};
 
-void CreatePyramid(std::vector<glm::vec3> &vVertexBuffer, std::vector<glm::vec3> &vNormalsBuffer, glm::vec3 size = {1, 1, 1});
+void AddTri(std::vector<Tri>& vTris, std::vector<Vertex> &vPoints, size_t a, size_t b, size_t c);
 
-void CreateCylinder(std::vector<glm::vec3> &vVertexBuffer, std::vector<glm::vec3> &vNormalsBuffer, float r = 0.5f, float h = 1.0f, int sides = 16, bool smooth = false);
+void AddQuad(std::vector<Tri>& vTris, std::vector<Vertex> &vPoints, size_t a, size_t b, size_t c, size_t d);
 
-void CreateSphere(std::vector<glm::vec3> &vVertexBuffer, std::vector<glm::vec3> &vNormalsBuffer, float r, bool smooth = false);
+void DetermineVertNormals(std::vector<Vertex>& vPoints, std::vector<Tri>& vTris);
+
+void FillBuffers(std::vector<Tri>& vTris, std::vector<glm::vec3> &vVertexBuffer, std::vector<glm::vec3> &vNormalsBuffer, bool smooth);

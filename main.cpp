@@ -1,12 +1,16 @@
 #include <GL/glew.h>
 #include <GL/gl.h>
+#include <GL/glu.h>
 #include <GLFW/glfw3.h>
+#include <glm/ext/matrix_float4x4.hpp>
+#include <glm/ext/vector_float3.hpp>
 #include <glm/glm.hpp>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/matrix_clip_space.hpp>
 
 #include "LoadShaders.h"
-#include "PlotVertices.h"
+#include "BasicShapes.h"
+#include "Gemstone.h"
 
 
 static constexpr int g_screenWidth = 1400;
@@ -18,7 +22,6 @@ int main(int, char**){
     glfwWindowHint(GLFW_SAMPLES, 4);
     GLFWwindow* w = glfwCreateWindow(g_screenWidth,g_screenHeight, "Faceting",NULL, NULL);
     glfwMakeContextCurrent(w);
-    glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
     glfwFocusWindow(w);
 
     // GLEW
@@ -44,25 +47,12 @@ int main(int, char**){
     glBindVertexArray(vertexArrayID);
 
     // Data
-    std::vector<glm::vec3> vVertexBufferData;
-    std::vector<glm::vec3> vNormalsBufferData;
-    //CreateBox(vVertexBufferData, vNormalsBufferData, glm::vec3(1,1,1), false);
-    CreateCylinder(vVertexBufferData, vNormalsBufferData, 0.5f, 1.0f, 32);
-
-    // Buffers
-    GLuint vertexBuffer;
-    glGenBuffers(1, &vertexBuffer);
-    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-    glBufferData(GL_ARRAY_BUFFER, vVertexBufferData.size() * sizeof(glm::vec3), &vVertexBufferData[0], GL_STATIC_DRAW);
-
-    GLuint normalBuffer;
-    glGenBuffers(1, &normalBuffer);
-    glBindBuffer(GL_ARRAY_BUFFER, normalBuffer);
-    glBufferData(GL_ARRAY_BUFFER, vNormalsBufferData.size() * sizeof(glm::vec3), &vNormalsBufferData[0], GL_STATIC_DRAW);
+    Gemstone gemstone(96);
+    gemstone.GenerateBuffers();
 
     // Attribute arrays
     glEnableVertexAttribArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, gemstone.GetVertexID());
     glVertexAttribPointer(
         0,
         3,
@@ -71,9 +61,8 @@ int main(int, char**){
         0,
         (void*)0
     );
-
     glEnableVertexAttribArray(1);
-    glBindBuffer(GL_ARRAY_BUFFER, normalBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, gemstone.GetNormalID());
     glVertexAttribPointer(
         1,
         3,
@@ -84,15 +73,28 @@ int main(int, char**){
     );
 
     // View Settings
-    glm::vec3 position = glm::vec3(0,0,5);
+    glm::vec3 position = glm::vec3(0,1.5,3);
     float yaw = 3.14;
-    float pitch = 0.0f;
+    float pitch = -0.5f;
     float fov = 45.0f;
     float moveSpeed = 10.0f;
     float lookSpeed = 0.1f;
+    glm::vec3 direction(
+        cos(pitch) * sin(yaw),
+        sin(pitch),
+        cos(pitch) * cos(yaw)
+    );
+    glm::vec3 right = glm::vec3(
+        sin(yaw - 3.14f/2.0f),
+        0,
+        cos(yaw - 3.14f/2.0f)
+    );
+    glm::vec3 up = glm::cross(right,direction);
+    glm::mat4 view = glm::lookAt(position ,position + direction, up);
+    //glm::mat4 view = glm::lookAt(position, glm::vec3(0,0,0), glm::vec3(0,1,0));
 
     // Camera
-    glm::mat4 projection = glm::perspective(glm::radians(45.0f), float(g_screenWidth) / float(g_screenHeight), 0.1f, 100.0f);
+    glm::mat4 projection = glm::perspective(glm::radians(fov), float(g_screenWidth) / float(g_screenHeight), 0.1f, 100.0f);
     double mouseX, mouseY;
 
     // Objects
@@ -104,39 +106,60 @@ int main(int, char**){
     double deltaTime = 0;
 
     while(!glfwWindowShouldClose(w) && glfwGetKey(w, GLFW_KEY_ESCAPE) != GLFW_PRESS) {
-        // Update Mouse Look
-        glfwGetCursorPos(w, &mouseX, &mouseY);
-        glfwSetCursorPos(w, g_screenWidth / 2.0, g_screenHeight / 2.0);
-        yaw += lookSpeed * deltaTime * float(g_screenWidth / 2.0 - mouseX);
-        pitch += lookSpeed * deltaTime * float(g_screenHeight / 2.0 - mouseY);
-        glm::vec3 direction(
-            cos(pitch) * sin(yaw),
-            sin(pitch),
-            cos(pitch) * cos(yaw)
-        );
-        glm::vec3 right = glm::vec3(
-            sin(yaw - 3.14f/2.0f),
-            0,
-            cos(yaw - 3.14f/2.0f)
-        );
-        glm::vec3 up = glm::cross(right,direction);
-
         // Update Movement
-        if(glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS){
-            position += direction * moveSpeed * (float)deltaTime;
+        if (glfwGetKey(w, GLFW_KEY_SPACE) == GLFW_PRESS) {
+            glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+            // Update Mouse Look
+            glfwGetCursorPos(w, &mouseX, &mouseY);
+            glfwSetCursorPos(w, g_screenWidth / 2.0, g_screenHeight / 2.0);
+            yaw += lookSpeed * deltaTime * float(g_screenWidth / 2.0 - mouseX);
+            pitch += lookSpeed * deltaTime * float(g_screenHeight / 2.0 - mouseY);
+            glm::vec3 direction(
+                cos(pitch) * sin(yaw),
+                sin(pitch),
+                cos(pitch) * cos(yaw)
+            );
+            glm::vec3 right = glm::vec3(
+                sin(yaw - 3.14f/2.0f),
+                0,
+                cos(yaw - 3.14f/2.0f)
+            );
+            glm::vec3 up = glm::cross(right,direction);
+            view = glm::lookAt(position ,position + direction, up);
+
+            if(glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS){
+                position += direction * moveSpeed * (float)deltaTime;
+            }
+            if (glfwGetKey(w, GLFW_KEY_S ) == GLFW_PRESS){
+                position -= direction * moveSpeed * (float)deltaTime;
+            }
+            if (glfwGetKey(w, GLFW_KEY_D ) == GLFW_PRESS){
+                position += right * moveSpeed * (float)deltaTime;
+            }
+            if (glfwGetKey(w, GLFW_KEY_A ) == GLFW_PRESS){
+                position -= right * moveSpeed * (float)deltaTime;
+            }
         }
-        if (glfwGetKey(w, GLFW_KEY_S ) == GLFW_PRESS){
-            position -= direction * moveSpeed * (float)deltaTime;
+        else {
+            glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            // camera position
+            position;
+
+            //direction
+            direction;
+
+            //fov
+            fov;
+
+            //ratio
+            g_screenWidth / g_screenHeight;
+
+
         }
-        if (glfwGetKey(w, GLFW_KEY_D ) == GLFW_PRESS){
-            position += right * moveSpeed * (float)deltaTime;
-        }
-        if (glfwGetKey(w, GLFW_KEY_A ) == GLFW_PRESS){
-            position -= right * moveSpeed * (float)deltaTime;
-        }
+        
 
         // Model View Projection
-        glm::mat4 view = glm::lookAt(position ,position + direction, up);
         glm::mat4 mvp = projection * view * model;
 
         // Shader uniforms
@@ -147,7 +170,7 @@ int main(int, char**){
 
         // Draw
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glDrawArrays(GL_TRIANGLES, 0, vVertexBufferData.size() * 3);
+        glDrawArrays(GL_TRIANGLES, 0, gemstone.GetVertexData().size() * 3);
         glfwSwapBuffers(w);
         glfwPollEvents();
 
@@ -159,8 +182,6 @@ int main(int, char**){
     // Clean up
     glDisableVertexAttribArray(0);
     glDisableVertexAttribArray(1);
-    glDeleteBuffers(1, &vertexBuffer);
-    glDeleteBuffers(1, &normalBuffer);
     glDeleteProgram(programID);
     glDeleteVertexArrays(1, &vertexArrayID);
 
